@@ -3,7 +3,7 @@ const cors = require('cors');
 const app = express();
 require('dotenv').config()
 const port = process.env.PORT || 3000;
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 
 // middleware
@@ -25,7 +25,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
     try {
-        
+
         await client.connect();
 
         const db = client.db('digital_life_lesson_db')
@@ -33,14 +33,36 @@ async function run() {
 
 
         // Lesson Related Apis
-        
+
         app.get('/lessons', async (req, res) => {
+            const query = {}
+
+            const { email } = req.query
+            if (email) {
+                query.email = email
+            }
+
+            const cursor = lessonCollection.find(query)
+            const result = await cursor.toArray()
+            res.send(result)
 
         })
 
-        app.post('/lessons', async( req, res) =>{
+        app.post('/lessons', async (req, res) => {
             const lesson = req.body;
             const result = await lessonCollection.insertOne(lesson)
+            res.send(result)
+        })
+
+        app.patch('/lessons/:id', async (req, res) => {
+            const id = req.params.id;
+            const { privacy } = req.body;
+            const query = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: { privacy }
+            }
+
+            const result = await lessonCollection.updateOne(query, updatedDoc)
             res.send(result)
         })
 
@@ -48,7 +70,7 @@ async function run() {
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
-       
+
     }
 }
 run().catch(console.dir);
