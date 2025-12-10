@@ -4,6 +4,8 @@ const app = express();
 require('dotenv').config()
 const port = process.env.PORT || 3000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
 
 
 // middleware
@@ -56,21 +58,53 @@ async function run() {
 
         app.patch('/lessons/:id', async (req, res) => {
             const id = req.params.id;
-            const { privacy } = req.body;
+            const updatedFields = req.body;
             const query = { _id: new ObjectId(id) }
             const updatedDoc = {
-                $set: { privacy }
+                $set: updatedFields
             }
 
             const result = await lessonCollection.updateOne(query, updatedDoc)
             res.send(result)
         })
 
-        app.delete('/lessons/:id', async(req, res) => {
+
+
+        app.delete('/lessons/:id', async (req, res) => {
             const id = req.params.id;
-            const query = {_id: new ObjectId(id)}
+            const query = { _id: new ObjectId(id) }
             const result = await lessonCollection.deleteOne(query)
             res.send(result)
+        })
+
+
+        // Payment releted apis
+        app.post('/create-checkout-session', async (req, res) => {
+            const paymentInfo = req.body;
+            const amount = 12 * 100
+            const session = await stripe.checkout.sessions.create({
+                line_items: [
+                    {
+                        price_data: {
+                            currency: 'USD',
+                            unit_amount: amount,
+                            product_data: {
+                                name: 'Premium Plan – Lifetime Access',
+                                description: 'Unlock premium lessons, ad-free experience, and priority listing.'
+                            }
+                        },
+                        quantity: 1,
+                    },
+                ],
+                mode: 'payment',
+                customer_email: paymentInfo.email,
+                metadata: {
+                    userEmail: paymentInfo.email
+                },
+                success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${process.env.SITE_DOMAIN}/payment-cancelled`,
+            })
+            res.send({ url: session.url })
         })
 
 
