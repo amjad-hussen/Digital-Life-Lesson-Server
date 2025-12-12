@@ -8,7 +8,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const admin = require("firebase-admin");
 
-const serviceAccount = require("./digital-life-lesson-firebase-adminsdk.json");
+const serviceAccount = require(process.env.FIREBASE_ADMINSDK);
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
@@ -73,6 +73,12 @@ async function run() {
 
 
         // User Relate Apis
+        app.get('/users', async (req, res) => {
+            const cursor = userCollection.find()
+            const result = await cursor.toArray()
+            res.send(result)
+        })
+
         app.post('/users' , async(req, res) => {
             const user = req.body;
             user.role = 'user'
