@@ -68,6 +68,26 @@ async function run() {
 
         const db = client.db('digital_life_lesson_db')
         const lessonCollection = db.collection('lessons')
+        const userCollection = db.collection('users')
+
+
+
+        // User Relate Apis
+        app.post('/users' , async(req, res) => {
+            const user = req.body;
+            user.role = 'user'
+            user.isPremium = false
+            user.createdAt = new Date()
+            const email = user.email
+            
+            const userExist = await userCollection.findOne({email})
+            if(userExist) {
+                return res.send({message: 'User Already Exist'})
+            }
+
+            const result = await userCollection.insertOne(user)
+            res.send(result)
+        })
 
 
         // Lesson Related Apis
@@ -157,9 +177,9 @@ async function run() {
                     }
                 }
                 const result = await userCollection.updateOne(query, updatedDoc)
-                res.send(result)
+                return res.send(result)
             }
-            res.send({ success: false })
+             return res.send({ success: false })
         })
 
 
