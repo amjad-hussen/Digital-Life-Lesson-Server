@@ -22,7 +22,7 @@ app.use(express.json())
 
 
 
-const verifyFBToken = async(req, res, next) => {
+const verifyFBToken = async (req, res, next) => {
 
     console.log('headers in the middleware', req.headers.authorization)
     const token = req.headers.authorization;
@@ -31,20 +31,20 @@ const verifyFBToken = async(req, res, next) => {
         return res.status(401).send({ message: 'unauthorized access' })
     }
 
-    try{
+    try {
         const idToken = token.split(' ')[1];
         const decoded = await admin.auth().verifyIdToken(idToken)
         console.log('decoded in the token ', decoded)
         req.decoded_email = decoded.email
-         next()
+        next()
     }
-    catch(error) {
-        return res.status(401).send({messsage: 'unauthorized access'})
+    catch (error) {
+        return res.status(401).send({ messsage: 'unauthorized access' })
 
     }
 
 
-   
+
 }
 
 
@@ -74,26 +74,43 @@ async function run() {
 
         // User Relate Apis
         app.get('/users', async (req, res) => {
-            const cursor = userCollection.find()
-            const result = await cursor.toArray()
-            res.send(result)
+            const email = req.query.email;
+            if (!email) {
+                return res.send([]);
+            }
+            const result = await userCollection.findOne({ email });
+            res.send(result);
         })
 
-        app.post('/users' , async(req, res) => {
+        app.post('/users', async (req, res) => {
             const user = req.body;
             user.role = 'user'
             user.isPremium = false
             user.createdAt = new Date()
             const email = user.email
-            
-            const userExist = await userCollection.findOne({email})
-            if(userExist) {
-                return res.send({message: 'User Already Exist'})
+
+            const userExist = await userCollection.findOne({ email })
+            if (userExist) {
+                return res.send({ message: 'User Already Exist' })
             }
 
             const result = await userCollection.insertOne(user)
             res.send(result)
         })
+
+        app.patch('/users/premium', async (req, res) => {
+            const email = req.body.email;
+
+            const query = { email: email };
+            const updatedDoc = {
+                $set: {
+                    isPremium: true
+                }
+            };
+
+            const result = await userCollection.updateOne(query, updatedDoc);
+            res.send(result);
+        });
 
 
         // Lesson Related Apis
@@ -185,7 +202,7 @@ async function run() {
                 const result = await userCollection.updateOne(query, updatedDoc)
                 return res.send(result)
             }
-             return res.send({ success: false })
+            return res.send({ success: false })
         })
 
 
