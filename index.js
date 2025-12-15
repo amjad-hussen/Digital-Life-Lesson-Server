@@ -158,6 +158,24 @@ async function run() {
             res.send(result)
         })
 
+        app.get('/lessons/recommended', async (req, res) => {
+            const { category, emotionalTone, excludeId, limit } = req.query;
+
+            let orConditions = [];
+            if (category) orConditions.push({ category });
+            if (emotionalTone) orConditions.push({ emotionalTone });
+
+            let query = {};
+            if (orConditions.length > 0) query.$or = orConditions;
+
+            if (excludeId && ObjectId.isValid(excludeId)) {
+                query._id = { $ne: new ObjectId(excludeId) };
+            }
+
+            const lessons = await lessonCollection.find(query).toArray();
+            res.send(lessons.slice(0, parseInt(limit) || 6));
+        });
+
         app.get('/lessons/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
@@ -247,6 +265,13 @@ async function run() {
 
 
 
+
+
+
+
+
+
+
         // Report Related Apis
         app.post('/report', async (req, res) => {
             const report = req.body;
@@ -256,15 +281,15 @@ async function run() {
 
 
         // Comments Collections
-        
+
         app.post('/lessons/:id/comment', verifyFBToken, async (req, res) => {
             const lessonId = req.params.id;
             const userEmail = req.decoded_email;
             const { text, userName } = req.body;
 
-            if (!userEmail){
+            if (!userEmail) {
                 return res.status(401).send({ success: false });
-            } 
+            }
 
             const comment = {
                 lessonId,
@@ -278,10 +303,10 @@ async function run() {
             res.send(result);
         });
 
-        
+
         app.get('/lessons/:id/comments', async (req, res) => {
             const lessonId = req.params.id;
-            const cursor =  commentCollection.find({lessonId}).sort({createdAt: -1})
+            const cursor = commentCollection.find({ lessonId }).sort({ createdAt: -1 })
             const result = await cursor.toArray()
             res.send(result);
         });
