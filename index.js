@@ -70,6 +70,7 @@ async function run() {
         const lessonCollection = db.collection('lessons')
         const userCollection = db.collection('users')
         const reportCollection = db.collection('reports')
+        const commentCollection = db.collection('comments')
 
 
 
@@ -203,7 +204,7 @@ async function run() {
 
         app.patch('/lessons/:id/favorite', verifyFBToken, async (req, res) => {
             const id = req.params.id;
-            const userEmail =req.decoded_email;;
+            const userEmail = req.decoded_email;;
 
             if (!userEmail) {
                 return res.status(401).send({ success: false, message: 'Unauthorized' });
@@ -216,7 +217,7 @@ async function run() {
             if (!lesson) {
                 return res.status(404).send({ success: false });
             }
-             const savesArray = lesson.saves || [];
+            const savesArray = lesson.saves || [];
             const alreadySaved = lesson.saves?.includes(userEmail);
 
             let updateDoc;
@@ -252,6 +253,39 @@ async function run() {
             const result = await reportCollection.insertOne(report)
             res.send(result)
         })
+
+
+        // Comments Collections
+        
+        app.post('/lessons/:id/comment', verifyFBToken, async (req, res) => {
+            const lessonId = req.params.id;
+            const userEmail = req.decoded_email;
+            const { text, userName } = req.body;
+
+            if (!userEmail){
+                return res.status(401).send({ success: false });
+            } 
+
+            const comment = {
+                lessonId,
+                userEmail,
+                userName,
+                text,
+                createdAt: new Date()
+            };
+
+            const result = await commentCollection.insertOne(comment);
+            res.send(result);
+        });
+
+        
+        app.get('/lessons/:id/comments', async (req, res) => {
+            const lessonId = req.params.id;
+            const cursor =  commentCollection.find({lessonId}).sort({createdAt: -1})
+            const result = await cursor.toArray()
+            res.send(result);
+        });
+
 
 
         // Payment releted apis
