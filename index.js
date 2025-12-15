@@ -69,6 +69,7 @@ async function run() {
         const db = client.db('digital_life_lesson_db')
         const lessonCollection = db.collection('lessons')
         const userCollection = db.collection('users')
+        const reportCollection = db.collection('reports')
 
 
 
@@ -153,6 +154,56 @@ async function run() {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const result = await lessonCollection.deleteOne(query)
+            res.send(result)
+        })
+
+        app.get('/lessons/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const result = await lessonCollection.findOne(query)
+            res.send(result)
+        })
+
+        // Toggle Like 
+        app.patch('/lessons/:id/like', verifyFBToken, async (req, res) => {
+            const id = req.params.id;
+            const userEmail = req.decoded_email;
+            const query = { _id: new ObjectId(id) }
+
+            const lesson = await lessonCollection.findOne(query);
+            if (!lesson) {
+                return res.status(404).send({ message: 'Lesson not found' });
+            }
+
+            let updatedLikes = lesson.likes || [];
+            let updatedReactionsCount = lesson.reactionsCount || 0;
+
+            if (updatedLikes.includes(userEmail)) {
+
+                updatedLikes = updatedLikes.filter(email => email !== userEmail);
+                updatedReactionsCount = Math.max(0, updatedReactionsCount - 1);
+            } else {
+
+                updatedLikes.push(userEmail);
+                updatedReactionsCount += 1;
+            }
+
+            const updatedDoc = {
+                $set: {
+                    likes: updatedLikes,
+                    reactionsCount: updatedReactionsCount
+                }
+            };
+
+            const result = await lessonCollection.updateOne(query , updatedDoc);
+            res.send({ success: true, likes: updatedLikes, reactionsCount: updatedReactionsCount });
+        })
+
+
+        // Report Related Apis
+        app.post('/report', async (req, res) => {
+            const report = req.body;
+            const result = await reportCollection.insertOne(report)
             res.send(result)
         })
 
