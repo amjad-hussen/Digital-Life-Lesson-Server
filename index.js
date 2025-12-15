@@ -195,9 +195,55 @@ async function run() {
                 }
             };
 
-            const result = await lessonCollection.updateOne(query , updatedDoc);
+            const result = await lessonCollection.updateOne(query, updatedDoc);
             res.send({ success: true, likes: updatedLikes, reactionsCount: updatedReactionsCount });
         })
+
+        // Saves Count 
+
+        app.patch('/lessons/:id/favorite', verifyFBToken, async (req, res) => {
+            const id = req.params.id;
+            const userEmail =req.decoded_email;;
+
+            if (!userEmail) {
+                return res.status(401).send({ success: false, message: 'Unauthorized' });
+            }
+
+            const query = { _id: new ObjectId(id) }
+
+            const lesson = await lessonCollection.findOne(query);
+
+            if (!lesson) {
+                return res.status(404).send({ success: false });
+            }
+             const savesArray = lesson.saves || [];
+            const alreadySaved = lesson.saves?.includes(userEmail);
+
+            let updateDoc;
+
+            if (alreadySaved) {
+                updateDoc = {
+                    $pull: { saves: userEmail },
+                    $inc: { savesCount: -1 }
+                };
+            } else {
+                updateDoc = {
+                    $addToSet: { saves: userEmail },
+                    $inc: { savesCount: 1 }
+                };
+            }
+
+            await lessonCollection.updateOne(query, updateDoc);
+
+            const updatedLesson = await lessonCollection.findOne(query);
+
+            res.send({
+                success: true,
+                saves: updatedLesson.saves,
+                savesCount: updatedLesson.savesCount
+            });
+        });
+
 
 
         // Report Related Apis
