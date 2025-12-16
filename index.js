@@ -71,6 +71,7 @@ async function run() {
         const userCollection = db.collection('users')
         const reportCollection = db.collection('reports')
         const commentCollection = db.collection('comments')
+        const favoriteCollection = db.collection('favorites');
 
 
 
@@ -218,7 +219,17 @@ async function run() {
             res.send({ success: true, likes: updatedLikes, reactionsCount: updatedReactionsCount });
         })
 
-        // Saves Count 
+        // Saves Count
+        app.get('/favorite', verifyFBToken, async (req, res) => {
+            const email = req.query.email;
+            if (!email) {
+                return res.send([]);
+            }
+
+            const result = await favoriteCollection .find({ userEmail: email }) .toArray();
+
+            res.send(result);
+        });
 
         app.patch('/lessons/:id/favorite', verifyFBToken, async (req, res) => {
             const id = req.params.id;
@@ -245,11 +256,24 @@ async function run() {
                     $pull: { saves: userEmail },
                     $inc: { savesCount: -1 }
                 };
+                await favoriteCollection.deleteOne({
+                    lessonId: new ObjectId(id),
+                    userEmail: userEmail
+                });
             } else {
                 updateDoc = {
                     $addToSet: { saves: userEmail },
                     $inc: { savesCount: 1 }
                 };
+                await favoriteCollection.insertOne({
+                    lessonId: new ObjectId(id),
+                    userEmail: userEmail,
+                    lessonTitle: lesson.lessonTitle,
+                    emotionalTone: lesson.emotionalTone,
+                    category: lesson.category,
+                    description: lesson.description,
+                    savedAt: new Date()
+                });
             }
 
             await lessonCollection.updateOne(query, updateDoc);
