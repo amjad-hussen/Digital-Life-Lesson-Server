@@ -76,6 +76,13 @@ async function run() {
 
 
         // User Relate Apis
+
+        app.get('/users', verifyFBToken, async (req, res) => {
+            const cursor = userCollection.find()
+            const result = await cursor.toArray()
+            res.send(result )
+        })
+
         app.get('/users', async (req, res) => {
             const email = req.query.email;
             if (!email) {
@@ -101,23 +108,36 @@ async function run() {
             res.send(result)
         })
 
+        app.patch('/users/:id', async(req, res) => {
+            const id  = req.params.id;
+            const roleInfo = req.body;
+            const query = {_id: new ObjectId(id)}
+            const updatedDoc = {
+                $set: {
+                    role:roleInfo.role
+                }
+            }
+            const result = await userCollection.updateOne(query, updatedDoc)
+            res.send(result)
+        } )
+
 
         app.patch('/users/:email', async (req, res) => {
             const email = req.params.email
             const updatedData = req.body
 
-                const query = { email: email }
-                const updateDoc = {
-                    $set: updatedData
-                }
-                const result = await userCollection.updateOne(query, updateDoc)
+            const query = { email: email }
+            const updateDoc = {
+                $set: updatedData
+            }
+            const result = await userCollection.updateOne(query, updateDoc)
 
-                if (result.matchedCount === 0) {
-                    return res.status(404).send({ message: 'User not found' })
-                }
+            if (result.matchedCount === 0) {
+                return res.status(404).send({ message: 'User not found' })
+            }
 
-                res.send({ message: 'User updated successfully', result })
-            
+            res.send({ message: 'User updated successfully', result })
+
         })
 
 
@@ -305,6 +325,13 @@ async function run() {
                 saves: updatedLesson.saves,
                 savesCount: updatedLesson.savesCount
             });
+        });
+
+        app.delete('/favorite/:id', async (req, res) => {
+            const { id } = req.params;
+            const query = { _id: new ObjectId(id) }
+            const result = await favoriteCollection.deleteOne(query);
+            res.send(result);
         });
 
 
