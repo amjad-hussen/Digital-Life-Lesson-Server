@@ -101,6 +101,26 @@ async function run() {
             res.send(result)
         })
 
+
+        app.patch('/users/:email', async (req, res) => {
+            const email = req.params.email
+            const updatedData = req.body
+
+                const query = { email: email }
+                const updateDoc = {
+                    $set: updatedData
+                }
+                const result = await userCollection.updateOne(query, updateDoc)
+
+                if (result.matchedCount === 0) {
+                    return res.status(404).send({ message: 'User not found' })
+                }
+
+                res.send({ message: 'User updated successfully', result })
+            
+        })
+
+
         app.patch('/users/premium', async (req, res) => {
             const email = req.body.email;
 
@@ -226,7 +246,7 @@ async function run() {
                 return res.send([]);
             }
 
-            const result = await favoriteCollection .find({ userEmail: email }) .toArray();
+            const result = await favoriteCollection.find({ userEmail: email }).toArray();
 
             res.send(result);
         });
