@@ -74,13 +74,27 @@ async function run() {
         const favoriteCollection = db.collection('favorites');
 
 
+        // middleware with database access
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded_email;
+            const query = { email }
+            const user = await userCollection.findOne(query)
+
+            if (!user || user.role !== 'admin') {
+                return res.status(403).send({ message: 'Forbidden Access' })
+            }
+
+            next()
+        }
+
+
 
         // User Relate Apis
 
         app.get('/users', verifyFBToken, async (req, res) => {
             const cursor = userCollection.find()
             const result = await cursor.toArray()
-            res.send(result )
+            res.send(result)
         })
 
         app.get('/users', async (req, res) => {
@@ -90,6 +104,13 @@ async function run() {
             }
             const result = await userCollection.findOne({ email });
             res.send(result);
+        })
+
+        app.get('/users/:email/role', verifyFBToken, async (req, res) => {
+            const email = req.params.email;
+            const query = { email }
+            const user = await userCollection.findOne(query)
+            res.send({ role: user?.role || 'user' })
         })
 
         app.post('/users', async (req, res) => {
@@ -108,18 +129,20 @@ async function run() {
             res.send(result)
         })
 
-        app.patch('/users/:id', async(req, res) => {
-            const id  = req.params.id;
+        app.patch('/users/:id/role', verifyFBToken, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
             const roleInfo = req.body;
-            const query = {_id: new ObjectId(id)}
+            const query = { _id: new ObjectId(id) }
             const updatedDoc = {
                 $set: {
-                    role:roleInfo.role
+                    role: roleInfo.role
                 }
             }
             const result = await userCollection.updateOne(query, updatedDoc)
             res.send(result)
-        } )
+        })
+
+
 
 
         app.patch('/users/:email', async (req, res) => {
@@ -172,6 +195,12 @@ async function run() {
 
         })
 
+        app.get('/lessons/count/:email', async (req, res) => {
+            const email = req.params.email;
+            const count = await lessonCollection.countDocuments({ email });
+            res.send({ count });
+        });
+
         app.post('/lessons', async (req, res) => {
             const lesson = req.body;
             const result = await lessonCollection.insertOne(lesson)
@@ -198,6 +227,37 @@ async function run() {
             const result = await lessonCollection.deleteOne(query)
             res.send(result)
         })
+
+        app.patch('/lessons/:id/featured', verifyFBToken, verifyAdmin, async (req, res) => {
+            const { id } = req.params;
+            const { isFeatured } = req.body;
+            const query = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    isFeatured: isFeatured,
+                    updatedAt: new Date()
+                }
+            }
+            const result = await lessonCollection.updateOne(query, updatedDoc);
+            res.send(result);
+        });
+
+
+        app.patch('/lessons/:id/reviewed', verifyFBToken, verifyAdmin, async (req, res) => {
+            const { id } = req.params;
+            const { isReviewed } = req.body;
+            const query = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    isReviewed: isReviewed,
+                    updatedAt: new Date()
+                }
+            }
+
+            const result = await lessonCollection.updateOne(query, updatedDoc);
+
+            res.send(result);
+        });
 
         app.get('/lessons/recommended', async (req, res) => {
             const { category, emotionalTone, excludeId, limit } = req.query;
