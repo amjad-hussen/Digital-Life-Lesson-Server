@@ -92,19 +92,42 @@ async function run() {
         // User Relate Apis
 
         app.get('/users', verifyFBToken, async (req, res) => {
-            const cursor = userCollection.find()
-            const result = await cursor.toArray()
-            res.send(result)
-        })
+            const { email, role } = req.query;
 
-        app.get('/users', async (req, res) => {
-            const email = req.query.email;
-            if (!email) {
-                return res.send([]);
+            if (!email && !role) {
+                // কোনো filter নাই => সব user return
+                const users = await userCollection.find().toArray();
+                return res.send(users);
             }
-            const result = await userCollection.findOne({ email });
-            res.send(result);
-        })
+
+            // email/role অনুযায়ী filter
+            const query = {};
+            if (email) query.email = email;
+            if (role) query.role = role;
+
+            const user = await userCollection.find(query).toArray();
+
+            // যদি email দিয়ে fetch করি তাহলে single object return করো
+            if (email) return res.send(user[0] || null);
+
+            res.send(user);
+        });
+
+
+        // app.get('/users', verifyFBToken, async (req, res) => {
+        //     const cursor = userCollection.find()
+        //     const result = await cursor.toArray()
+        //     res.send(result)
+        // })
+
+        // app.get('/users', async (req, res) => {
+        //     const email = req.query.email;
+        //     if (!email) {
+        //         return res.send([]);
+        //     }
+        //     const result = await userCollection.findOne({ email });
+        //     res.send(result);
+        // })
 
         app.get('/users/:email/role', verifyFBToken, async (req, res) => {
             const email = req.params.email;
@@ -112,6 +135,8 @@ async function run() {
             const user = await userCollection.findOne(query)
             res.send({ role: user?.role || 'user' })
         })
+
+
 
         app.post('/users', async (req, res) => {
             const user = req.body;
@@ -179,7 +204,98 @@ async function run() {
         });
 
 
+        // app.get('/users', async (req, res) => {
+        //     const { email, role } = req.query;
+        //     const query = { email };
+        //     if (role) query.role = role;
+        //     const user = await userCollection.findOne(query);
+        //     res.send(user);
+        // });
+
+
         // Lesson Related Apis
+
+        app.get('/admin/overview', verifyFBToken, verifyAdmin, async (req, res) => {
+            try {
+                const totalUsers = await userCollection.countDocuments();
+                const totalLessons = await lessonCollection.countDocuments({ isReviewed: true });
+                const totalReports = await reportCollection.countDocuments();
+
+                // Today's lessons
+                const now = new Date();
+                const startOfTodayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+                const endOfTodayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+
+                const todaysLessons = await lessonCollection.countDocuments({
+                    createdAt: { $gte: startOfTodayUTC, $lt: endOfTodayUTC }
+                });
+
+                // Top contributors
+                const topContributors = await lessonCollection.aggregate([
+                    {
+                        $group: {
+                            _id: "$email",
+                            count: { $sum: 1 },
+                            authorName: { $first: "$userName" }
+                        }
+                    },
+                    { $sort: { count: -1 } },
+                    { $limit: 5 }
+                ]).toArray();
+
+                // Last 7 days
+                const getLast7Days = () => {
+                    const days = [];
+                    for (let i = 6; i >= 0; i--) {
+                        const d = new Date();
+                        d.setDate(d.getDate() - i);
+                        days.push(d.toISOString().split("T")[0]); // YYYY-MM-DD
+                    }
+                    return days;
+                };
+                const last7Days = getLast7Days();
+
+                const weeklyLessonGrowth = await Promise.all(
+                    last7Days.map(async (day) => {
+                        const start = new Date(day + "T00:00:00Z");
+                        const end = new Date(day + "T23:59:59Z");
+                        const count = await lessonCollection.countDocuments({
+                            createdAt: { $gte: start, $lte: end }
+                        });
+                        return { date: day.slice(5), count }; // MM-DD
+                    })
+                );
+
+                const weeklyUserGrowth = await Promise.all(
+                    last7Days.map(async (day) => {
+                        const start = new Date(day + "T00:00:00Z");
+                        const end = new Date(day + "T23:59:59Z");
+                        const count = await userCollection.countDocuments({
+                            createdAt: { $gte: start, $lte: end }
+                        });
+                        return { date: day.slice(5), count }; // MM-DD
+                    })
+                );
+
+                res.send({
+                    totalUsers,
+                    totalLessons,
+                    totalReports,
+                    todaysLessons,
+                    topContributors,
+                    weeklyLessonGrowth,
+                    weeklyUserGrowth
+                });
+
+            } catch (error) {
+                console.error("Admin Overview Error:", error);
+                res.status(500).send({ message: "Server Error" });
+            }
+        });
+
+
+
+
 
         app.get('/lessons', async (req, res) => {
             const query = {}
@@ -487,7 +603,8 @@ async function run() {
                     }
                 }
                 const result = await userCollection.updateOne(query, updatedDoc)
-                return res.send(result)
+
+                return res.send({ success: true, userEmail, result });
             }
             return res.send({ success: false })
         })
